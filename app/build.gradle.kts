@@ -30,7 +30,7 @@ val verName = "v1.0"
 android {
     namespace = "org.matrix.TEESimulator"
     compileSdk = 36
-    ndkVersion = "28.2.13676358"
+    ndkVersion = "27.3.13750724"
     buildToolsVersion = "36.0.0"
 
     defaultConfig {
@@ -39,26 +39,6 @@ android {
         targetSdk = 36
         versionCode = gitCommitCount
         versionName = verName
-
-        externalNativeBuild {
-            cmake {
-                arguments += "-DANDROID_STL=none"
-                arguments += "-DCMAKE_BUILD_TYPE=Release"
-                arguments += "-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON"
-                arguments += "-DANDROID_ALLOW_UNDEFINED_SYMBOLS=ON"
-                arguments += "-DCMAKE_CXX_STANDARD=23"
-                arguments += "-DCMAKE_C_STANDARD=23"
-                arguments += "-DCMAKE_INTERPROCEDURAL_OPTIMIZATION=ON"
-                arguments += "-DLSPLT_BUILD_SHARED=OFF"
-                arguments += "-DLSPLT_STANDALONE=ON"
-
-                cppFlags += "-std=c++23"
-                cppFlags += "-fno-exceptions"
-                cppFlags += "-fno-rtti"
-                cppFlags += "-fvisibility=hidden"
-                cppFlags += "-fvisibility-inlines-hidden"
-            }
-        }
     }
 
     buildFeatures { prefab = true }
@@ -91,7 +71,6 @@ dependencies {
     compileOnly(project(":stub"))
     compileOnly(libs.annotation)
     implementation(libs.org.bouncycastle.bcpkix.jdk18on)
-    implementation(libs.org.lsposed.libcxx.libcxx)
 }
 
 androidComponents {
