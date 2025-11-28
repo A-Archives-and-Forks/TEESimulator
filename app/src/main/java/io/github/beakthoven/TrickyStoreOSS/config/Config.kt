@@ -184,7 +184,7 @@ object PkgConfig {
         if (!keybox.exists()) {
             Logger.e("default keybox file not found, please put it to $keybox !")
         } else {
-            updateKeyBox(keybox)
+            KeyBoxUtils.getKeybox(DEFAULT_KEYBOX_FILE, "")
         }
         storeTEEStatus(root)
         val patchFile = File(root, PATCHLEVEL_FILE)
