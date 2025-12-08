@@ -67,7 +67,7 @@ class KeyMintSecurityLevelInterceptor(
                 SystemLogger.info(
                     "[TX_ID: $txId] Forward to post-importKey hook for ${keyDescriptor.alias}[${keyDescriptor.nspace}]"
                 )
-                TransactionResult.Continue
+                return TransactionResult.Continue
             }
         }
 
