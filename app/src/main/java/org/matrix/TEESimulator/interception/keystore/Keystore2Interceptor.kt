@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import android.hardware.security.keymint.KeyOrigin
 import android.hardware.security.keymint.SecurityLevel
 import android.hardware.security.keymint.Tag
+import android.os.Build
 import android.os.IBinder
 import android.os.Parcel
 import android.system.keystore2.IKeystoreService
@@ -33,6 +34,11 @@ object Keystore2Interceptor : AbstractKeystoreInterceptor() {
         InterceptorUtils.getTransactCode(IKeystoreService.Stub::class.java, "deleteKey")
     private val UPDATE_SUBCOMPONENT_TRANSACTION =
         InterceptorUtils.getTransactCode(IKeystoreService.Stub::class.java, "updateSubcomponent")
+    private val LIST_ENTRIES_TRANSACTION =
+        InterceptorUtils.getTransactCode(IKeystoreService.Stub::class.java, "listEntries")
+    private val LIST_ENTRIES_BATCHED_TRANSACTION =
+        InterceptorUtils.getTransactCode(IKeystoreService.Stub::class.java, "listEntriesBatched")
+            .takeIf { Build.VERSION.SDK_INT >= 34 }
 
     private val transactionNames: Map<Int, String> by lazy {
         IKeystoreService.Stub::class
@@ -91,7 +97,28 @@ object Keystore2Interceptor : AbstractKeystoreInterceptor() {
         callingPid: Int,
         data: Parcel,
     ): TransactionResult {
-        if (
+        if (code == LIST_ENTRIES_TRANSACTION || code == LIST_ENTRIES_BATCHED_TRANSACTION) {
+            logTransaction(txId, transactionNames[code]!!, callingUid, callingPid)
+
+            if (ConfigurationManager.shouldSkipUid(callingUid))
+                return TransactionResult.ContinueAndSkipPost
+
+            return runCatching {
+                    val isBatchMode = code == LIST_ENTRIES_BATCHED_TRANSACTION
+                    if (ListEntriesHandler.cacheParameters(txId, data, isBatchMode)) {
+                        TransactionResult.Continue
+                    } else {
+                        TransactionResult.ContinueAndSkipPost
+                    }
+                }
+                .getOrElse {
+                    SystemLogger.error(
+                        "[TX_ID: $txId] Failed to parse parameters for ${transactionNames[code]!!}",
+                        it,
+                    )
+                    TransactionResult.ContinueAndSkipPost
+                }
+        } else if (
             code == GET_KEY_ENTRY_TRANSACTION ||
                 code == DELETE_KEY_TRANSACTION ||
                 code == UPDATE_SUBCOMPONENT_TRANSACTION
@@ -163,7 +190,22 @@ object Keystore2Interceptor : AbstractKeystoreInterceptor() {
         if (target != keystoreService || reply == null || InterceptorUtils.hasException(reply))
             return TransactionResult.SkipTransaction
 
-        if (code == GET_KEY_ENTRY_TRANSACTION) {
+        if (code == LIST_ENTRIES_TRANSACTION || code == LIST_ENTRIES_BATCHED_TRANSACTION) {
+            logTransaction(txId, "post-${transactionNames[code]!!}", callingUid, callingPid)
+
+            return runCatching {
+                    val updatedKeyDescriptors =
+                        ListEntriesHandler.injectGeneratedKeys(txId, callingUid, reply)
+                    InterceptorUtils.createTypedArrayReply(updatedKeyDescriptors)
+                }
+                .getOrElse {
+                    SystemLogger.error(
+                        "[TX_ID: $txId] Failed to update the result of ${transactionNames[code]!!}.",
+                        it,
+                    )
+                    TransactionResult.SkipTransaction
+                }
+        } else if (code == GET_KEY_ENTRY_TRANSACTION) {
             logTransaction(txId, "post-${transactionNames[code]!!}", callingUid, callingPid)
 
             data.enforceInterface(IKeystoreService.DESCRIPTOR)
